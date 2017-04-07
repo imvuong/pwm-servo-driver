@@ -1,10 +1,17 @@
 #!/usr/bin/python
 
 
-# For a 50Hz PWM frequency, each cycle is 20ms wide. 
-# To make a pulse 1ms wide, you have it rise at 0 and fall at 205. 
-# To make the pulse 2ms wide, you have it rise at 0 and fall at 410. 
+# For a 50Hz PWM frequency, each cycle is 20ms wide.
+# To make a pulse 1ms wide, you have it rise at 0 and fall at 205.
+# To make the pulse 2ms wide, you have it rise at 0 and fall at 410.
 # The neutral position would be halfway between the two, rising at 0 and falling at 307.
+
+# Import SPI library (for hardware SPI) and MCP3008 library.
+import Adafruit_GPIO.SPI as SPI
+import Adafruit_MCP3008
+
+import time
+from threading import Thread
 
 from Adafruit_PWM_Servo_Driver import PWM
 import sys, termios, tty, os, time
@@ -23,12 +30,23 @@ FR_WHEEL = 4
 BL_WHEEL = 8
 BR_WHEEL = 12
 
+MODE_MANUAL = 0
+MODE_AUTO = 1
+
+# Software SPI configuration:
+CLK  = 18
+MISO = 23
+MOSI = 24
+CS   = 25
+mcp = Adafruit_MCP3008.MCP3008(clk=CLK, cs=CS, miso=MISO, mosi=MOSI)
+
 
 # Initialise the PWM device using the default address
 pwm = PWM(0x40)
 # Note if you'd like more debug output you can instead run:
 #pwm = PWM(0x40, debug=True)
 
+robot_mode = MODE_MANUAL
 pwm_frequency = 50              # Set desired frequency (Hz)
 pwm_single_pulse_ms = 20        # Set single pulse period (ms)
 max_pulse_length = 4096         # Max pulse length (ms)
@@ -39,45 +57,48 @@ counter_clockwise_max_ms = 1.3  # Continuous servo counter clockwise rotation ma
 clockwise_pulse = round(max_pulse_length / pwm_single_pulse_ms * clockwise_max_ms)
 counter_clockwise_pulse = round(max_pulse_length / pwm_single_pulse_ms * counter_clockwise_max_ms)
 
+danger_direction = [False] * 4
+danger_label_name = ['back', 'right', 'front', 'left']
+
 def stop():
     set_left_wheels(neutral)
     set_right_wheels(neutral)
-    client.send_message("/robot/left", neutral_ms)
-    client.send_message("/robot/right", neutral_ms)
-    client.send_message("/robot/banner", "HALT!!!")
+    client.send_message("/robot/fader_left", neutral_ms)
+    client.send_message("/robot/fader_right", neutral_ms)
+    client.send_message("/robot/label_banner", "HALT!!!")
 
 def forward():
     set_left_wheels(clockwise_pulse)
     set_right_wheels(counter_clockwise_pulse)
-    client.send_message("/robot/left", clockwise_max_ms)
-    client.send_message("/robot/right", counter_clockwise_max_ms)
-    client.send_message("/robot/banner", "Full speed ahead!!!")
+    client.send_message("/robot/fader_left", clockwise_max_ms)
+    client.send_message("/robot/fader_right", counter_clockwise_max_ms)
+    client.send_message("/robot/label_banner", "Full speed ahead!!!")
 
 def backward():
     set_left_wheels(counter_clockwise_pulse)
     set_right_wheels(clockwise_pulse)
-    client.send_message("/robot/left", counter_clockwise_max_ms)
-    client.send_message("/robot/right", clockwise_max_ms)
-    client.send_message("/robot/banner", "Watch out behind me!!!")
+    client.send_message("/robot/fader_left", counter_clockwise_max_ms)
+    client.send_message("/robot/fader_right", clockwise_max_ms)
+    client.send_message("/robot/label_banner", "Watch out behind me!!!")
 
 def turn_left():
     set_left_wheels(counter_clockwise_pulse)
     set_right_wheels(counter_clockwise_pulse)
-    client.send_message("/robot/left", counter_clockwise_max_ms)
-    client.send_message("/robot/right", counter_clockwise_max_ms)
-    client.send_message("/robot/banner", "Making a left!!!")
+    client.send_message("/robot/fader_left", counter_clockwise_max_ms)
+    client.send_message("/robot/fader_right", counter_clockwise_max_ms)
+    client.send_message("/robot/label_banner", "Making a left!!!")
 
 def turn_right():
     set_left_wheels(clockwise_pulse)
     set_right_wheels(clockwise_pulse)
-    client.send_message("/robot/left", clockwise_max_ms)
-    client.send_message("/robot/right", clockwise_max_ms)
-    client.send_message("/robot/banner", "Making a right!!!")
+    client.send_message("/robot/fader_left", clockwise_max_ms)
+    client.send_message("/robot/fader_right", clockwise_max_ms)
+    client.send_message("/robot/label_banner", "Making a right!!!")
 
 def set_left_wheels(pulse):
     pwm.setPWM(FL_WHEEL, 0, pulse)
     pwm.setPWM(BL_WHEEL, 0, pulse)
-    
+
 def set_right_wheels(pulse):
     pwm.setPWM(FR_WHEEL, 0, pulse)
     pwm.setPWM(BR_WHEEL, 0, pulse)
@@ -85,32 +106,63 @@ def set_right_wheels(pulse):
 def ping_handler(unused_addr, args):
     print("[{0}]".format(args[0]))
 
+def mode_change(mode):
+    if (mode == MODE_MANUAL):
+        client.send_message("/robot/label_mode", "Manual")
+        client.send_message("/robot/label_banner", "Back to manual mode")
+    else
+        client.send_message("/robot/label_mode", "Automatic")
+        client.send_message("/robot/label_banner", "Look mom! I'm driving by myself!")
+
+
 @debounce(0.1)
-def left_handler(unused_addr, args, value):
+def fader_left_handler(unused_addr, args, value):
     print("[{0}] ~ {1}".format(args[0], value))
     pulse = round(max_pulse_length / pwm_single_pulse_ms * value)
     set_left_wheels(pulse)
-    client.send_message("/robot/banner", " ")
+    client.send_message("/robot/label_banner", " ")
 
 @debounce(0.1)
-def right_handler(unused_addr, args, value):
+def fader_right_handler(unused_addr, args, value):
     print("[{0}] ~ {1}".format(args[0], value))
     pulse = round(max_pulse_length / pwm_single_pulse_ms * value)
     set_right_wheels(pulse)
-    client.send_message("/robot/banner", " ")
+    client.send_message("/robot/label_banner", " ")
 
 def push_button_handler(unused_addr, args, value):
     print("[{0}] ~ {1}".format(args[0], value))
-    if (args[0] == "stop"):
+    if (args[0] == "push_stop"):
         stop()
-    elif (args[0] == "turn_left"):
+    elif (args[0] == "push_turn_left"):
         turn_left()
-    elif (args[0] == "turn_right"):
+    elif (args[0] == "push_turn_right"):
         turn_right()
-    elif (args[0] == "forward"):
+    elif (args[0] == "push_forward"):
         forward()
-    elif (args[0] == "backward"):
+    elif (args[0] == "push_backward"):
         backward()
+    elif (args[0] == "label_mode"):
+        mode_change(value)
+
+def read_ir_sensors():
+    while True:
+    # Read all the ADC channel values in a list.
+    values = [0]*8
+    IR_THRESHOLD = 1000
+    for i in range(8):
+        # The read_adc function will get the value of the specified channel (0-7).
+        values[i] = mcp.read_adc(i)
+        if (values[i] > IR_THRESHOLD):
+            danger_direction[i] = True
+            client.send_message("/robot/label_danger_" + danger_label_name[i], "Danger!!!")
+        else
+            danger_direction[i] = False
+            client.send_message("/robot/label_danger_" + danger_label_name[i], "")
+
+    # Print the ADC values.
+    print('| {0:>4} | {1:>4} | {2:>4} | {3:>4} | {4:>4} | {5:>4} | {6:>4} | {7:>4} |'.format(*values))
+    # Pause for half a second.
+    time.sleep(0.5)
 
 
 pwm.setPWMFreq(pwm_frequency)
@@ -124,74 +176,25 @@ args = parser.parse_args()
 
 dispatcher = dispatcher.Dispatcher()
 dispatcher.map("/ping", ping_handler, "ping")
-dispatcher.map("/robot/left", left_handler, "left")
-dispatcher.map("/robot/right", right_handler, "right")
-dispatcher.map("/robot/stop", push_button_handler, "stop")
-dispatcher.map("/robot/forward", push_button_handler, "forward")
+dispatcher.map("/robot/fader_left", fader_left_handler, "fader_left")
+dispatcher.map("/robot/fader_right", fader_right_handler, "fader_right")
+dispatcher.map("/robot/push_stop", push_button_handler, "push_stop")
+dispatcher.map("/robot/push_forward", push_button_handler, "push_forward")
 dispatcher.map("/robot/backward", push_button_handler, "backward")
 dispatcher.map("/robot/turn_left", push_button_handler, "turn_left")
 dispatcher.map("/robot/turn_right", push_button_handler, "turn_right")
+dispatcher.map("/robot/mode", push_button_handler, "mode")
 
 server = osc_server.ThreadingOSCUDPServer((args.server, args.server_port), dispatcher)
 client = udp_client.SimpleUDPClient(args.client, args.client_port)
 
-# Set to stop
+# Set to servo motors to stop
 stop()
 
+# Start background thread to read IR sensors
+background_thread = Thread(target=read_ir_sensors)
+background_thread.start()
+
+# Listen for TouchOSC messages
 print("Serving on {}".format(server.server_address))
 server.serve_forever()
-
-# button_delay = 0.2
-# while True:
-#     char = getch()
-
-#     if (char == "x"):
-#         print("Exit!")
-#         exit(0)
-
-#     if (char == "s"):
-#         print("Stop")
-#         stop()
-#         time.sleep(button_delay)
-
-#     elif (char == "f"):
-#         print("Forward")
-#         forward()
-#         time.sleep(button_delay)
-
-#     elif (char == "b"):
-#         print("Backward")
-#         backward()
-#         time.sleep(button_delay)
-
-#     elif (char == "l"):
-#         print("Turn Left")
-#         turn_left()
-#         time.sleep(button_delay)
-
-#     elif (char == "r"):
-#         print("Turn Right")
-#         turn_right()
-#         time.sleep(button_delay)
-
-# while (True):
-    # Change speed of continuous servo on channel O
-    # pwm.setPWM(0, 0, servoMin)
-    # time.sleep(1)
-    # pwm.setPWM(0, 0, servoMax)
-    # time.sleep(1)
-
-    # pwm.setPWM(4, 0, servoMin)
-    # time.sleep(1)
-    # pwm.setPWM(4, 0, servoMax)
-    # time.sleep(1)
-
-    # pwm.setPWM(8, 0, servoMin)
-    # time.sleep(1)
-    # pwm.setPWM(8, 0, servoMax)
-    # time.sleep(1)
-
-    # pwm.setPWM(12, 0, servoMin)
-    # time.sleep(1)
-    # pwm.setPWM(12, 0, servoMax)
-    # time.sleep(1)
