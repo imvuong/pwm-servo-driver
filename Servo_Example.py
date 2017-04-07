@@ -157,7 +157,7 @@ def read_ir_sensors():
                 client.send_message("/robot/label_danger_" + danger_label_name[i], "Danger!!!")
             else:
                 danger_direction[i] = False
-                client.send_message("/robot/label_danger_" + danger_label_name[i], "")
+                client.send_message("/robot/label_danger_" + danger_label_name[i], " ")
 
         # Print the ADC values.
         print('| {0:>4} | {1:>4} | {2:>4} | {3:>4} | {4:>4} | {5:>4} | {6:>4} | {7:>4} |'.format(*values))
