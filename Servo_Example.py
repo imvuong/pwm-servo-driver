@@ -110,7 +110,7 @@ def mode_change(mode):
     if (mode == MODE_MANUAL):
         client.send_message("/robot/label_mode", "Manual")
         client.send_message("/robot/label_banner", "Back to manual mode")
-    else
+    else:
         client.send_message("/robot/label_mode", "Automatic")
         client.send_message("/robot/label_banner", "Look mom! I'm driving by myself!")
 
@@ -147,22 +147,22 @@ def push_button_handler(unused_addr, args, value):
 def read_ir_sensors():
     while True:
     # Read all the ADC channel values in a list.
-    values = [0]*8
-    IR_THRESHOLD = 1000
-    for i in range(8):
-        # The read_adc function will get the value of the specified channel (0-7).
-        values[i] = mcp.read_adc(i)
-        if (values[i] > IR_THRESHOLD):
-            danger_direction[i] = True
-            client.send_message("/robot/label_danger_" + danger_label_name[i], "Danger!!!")
-        else:
-            danger_direction[i] = False
-            client.send_message("/robot/label_danger_" + danger_label_name[i], "")
+        values = [0]*8
+        IR_THRESHOLD = 1000
+        for i in range(8):
+            # The read_adc function will get the value of the specified channel (0-7).
+            values[i] = mcp.read_adc(i)
+            if (values[i] > IR_THRESHOLD):
+                danger_direction[i] = True
+                client.send_message("/robot/label_danger_" + danger_label_name[i], "Danger!!!")
+            else:
+                danger_direction[i] = False
+                client.send_message("/robot/label_danger_" + danger_label_name[i], "")
 
-    # Print the ADC values.
-    print('| {0:>4} | {1:>4} | {2:>4} | {3:>4} | {4:>4} | {5:>4} | {6:>4} | {7:>4} |'.format(*values))
-    # Pause for half a second.
-    time.sleep(0.5)
+        # Print the ADC values.
+        print('| {0:>4} | {1:>4} | {2:>4} | {3:>4} | {4:>4} | {5:>4} | {6:>4} | {7:>4} |'.format(*values))
+        # Pause for half a second.
+        time.sleep(0.5)
 
 
 pwm.setPWMFreq(pwm_frequency)
