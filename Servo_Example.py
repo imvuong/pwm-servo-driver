@@ -155,7 +155,7 @@ def read_ir_sensors():
         if (values[i] > IR_THRESHOLD):
             danger_direction[i] = True
             client.send_message("/robot/label_danger_" + danger_label_name[i], "Danger!!!")
-        else
+        else:
             danger_direction[i] = False
             client.send_message("/robot/label_danger_" + danger_label_name[i], "")
 
