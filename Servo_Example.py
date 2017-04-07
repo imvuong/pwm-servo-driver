@@ -147,9 +147,9 @@ def push_button_handler(unused_addr, args, value):
 def read_ir_sensors():
     while True:
     # Read all the ADC channel values in a list.
-        values = [0]*8
+        values = [0]*4
         IR_THRESHOLD = 1000
-        for i in range(8):
+        for i in range(4):
             # The read_adc function will get the value of the specified channel (0-7).
             values[i] = mcp.read_adc(i)
             if (values[i] > IR_THRESHOLD):
@@ -160,7 +160,7 @@ def read_ir_sensors():
                 client.send_message("/robot/label_danger_" + danger_label_name[i], " ")
 
         # Print the ADC values.
-        print('| {0:>4} | {1:>4} | {2:>4} | {3:>4} | {4:>4} | {5:>4} | {6:>4} | {7:>4} |'.format(*values))
+        print('| {0:>4} | {1:>4} | {2:>4} | {3:>4} |'.format(*values))
         # Pause for half a second.
         time.sleep(0.5)
 
