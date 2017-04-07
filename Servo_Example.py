@@ -1,6 +1,5 @@
 #!/usr/bin/python
 
-
 # For a 50Hz PWM frequency, each cycle is 20ms wide.
 # To make a pulse 1ms wide, you have it rise at 0 and fall at 205.
 # To make the pulse 2ms wide, you have it rise at 0 and fall at 410.
@@ -141,7 +140,7 @@ def push_button_handler(unused_addr, args, value):
         forward()
     elif (args[0] == "push_backward"):
         backward()
-    elif (args[0] == "label_mode"):
+    elif (args[0] == "push_mode"):
         mode_change(value)
 
 def read_ir_sensors():
@@ -180,10 +179,10 @@ dispatcher.map("/robot/fader_left", fader_left_handler, "fader_left")
 dispatcher.map("/robot/fader_right", fader_right_handler, "fader_right")
 dispatcher.map("/robot/push_stop", push_button_handler, "push_stop")
 dispatcher.map("/robot/push_forward", push_button_handler, "push_forward")
-dispatcher.map("/robot/backward", push_button_handler, "backward")
-dispatcher.map("/robot/turn_left", push_button_handler, "turn_left")
-dispatcher.map("/robot/turn_right", push_button_handler, "turn_right")
-dispatcher.map("/robot/mode", push_button_handler, "mode")
+dispatcher.map("/robot/push_backward", push_button_handler, "push_backward")
+dispatcher.map("/robot/push_turn_left", push_button_handler, "push_turn_left")
+dispatcher.map("/robot/push_turn_right", push_button_handler, "push_turn_right")
+dispatcher.map("/robot/push_mode", push_button_handler, "push_mode")
 
 server = osc_server.ThreadingOSCUDPServer((args.server, args.server_port), dispatcher)
 client = udp_client.SimpleUDPClient(args.client, args.client_port)
