@@ -57,7 +57,7 @@ clockwise_pulse = round(max_pulse_length / pwm_single_pulse_ms * clockwise_max_m
 counter_clockwise_pulse = round(max_pulse_length / pwm_single_pulse_ms * counter_clockwise_max_ms)
 
 danger_direction = [False] * 4
-danger_label_name = ['back', 'right', 'front', 'left']
+danger_label_name = ['back', 'front_left', 'front_right', 'front']
 
 def stop():
     set_left_wheels(neutral)
@@ -152,6 +152,7 @@ def read_ir_sensors():
             # The read_adc function will get the value of the specified channel (0-7).
             values[i] = mcp.read_adc(i)
             if (values[i] > IR_THRESHOLD):
+                stop()
                 danger_direction[i] = True
                 client.send_message("/robot/label_danger_" + danger_label_name[i], "Danger!!!")
             else:
